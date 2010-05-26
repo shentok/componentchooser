@@ -17,6 +17,7 @@
 #include <kopenwithdialog.h>
 #include <kglobalsettings.h>
 #include <kconfiggroup.h>
+#include <KServiceTypeTrader>
 
 
 
@@ -24,10 +25,7 @@ CfgBrowser::CfgBrowser(QWidget *parent)
     : QWidget(parent), Ui::BrowserConfig_UI(),CfgPlugin()
 {
     setupUi(this);
-    connect(lineExec,SIGNAL(textChanged(const QString &)),this,SLOT(configChanged()));
-    connect(radioKIO,SIGNAL(toggled(bool)),this,SLOT(configChanged()));
-    connect(radioExec,SIGNAL(toggled(bool)),this,SLOT(configChanged()));
-    connect(btnSelectBrowser,SIGNAL(clicked()),this, SLOT(selectBrowser()));
+    connect(kcombobox, SIGNAL(currentIndexChanged(int)), this, SLOT(configChanged()));
 }
 
 CfgBrowser::~CfgBrowser() {
@@ -44,72 +42,52 @@ void CfgBrowser::defaults()
 }
 
 
-void CfgBrowser::load(KConfig *) 
+void CfgBrowser::load(KConfig *)
 {
-    KConfigGroup config(KSharedConfig::openConfig("kdeglobals"), QLatin1String("General") );
-    QString exec = config.readPathEntry( QLatin1String("BrowserApplication"), QString("") );
-    if (exec.isEmpty())
+    m_browsers.clear();
+    kcombobox->clear();
+
+    foreach(KService::Ptr browser, KServiceTypeTrader::self()->query("Application", "'WebBrowser' in Categories"))
     {
-        radioKIO->setChecked(true);
-        m_browserExec = exec;
-        m_browserService = 0;
-    }
-    else
-    {
-        radioExec->setChecked(true);
-        if (exec.startsWith('!'))
-        {
-            m_browserExec = exec.mid(1);
-            m_browserService = 0;
-        }
-        else
-        {
-            m_browserService = KService::serviceByStorageId( exec );
-            if (m_browserService)
-                m_browserExec = m_browserService->desktopEntryName();
-            else
-                m_browserExec.clear();
-        }
+        m_browsers << browser;
+        kcombobox->addItem(KIcon(browser->icon()), browser->name());
     }
 
-    lineExec->setText(m_browserExec);
+    KConfigGroup config(KSharedConfig::openConfig("kdeglobals"), QLatin1String("General") );
+    QString exec = config.readPathEntry( QLatin1String("BrowserApplication"), QString("") );
+    if (!exec.isEmpty())
+    {
+        KService::Ptr browserService = KService::serviceByStorageId( exec );
+        if (browserService)
+        {
+            int i = 0;
+            foreach(KService::Ptr browser, m_browsers)
+            {
+                if (browser->storageId() == browserService->storageId())
+                {
+                    kcombobox->setCurrentIndex(i);
+                }
+                i++;
+            }
+        }
+    }
 
     emit changed(false);
 }
 
 void CfgBrowser::save(KConfig *)
 {
-    KConfigGroup config(KSharedConfig::openConfig("kdeglobals"), QLatin1String("General") );
     QString exec;
-    if (radioExec->isChecked())
+    if (m_browsers.count() > kcombobox->currentIndex())
     {
-        exec = lineExec->text();
-        if (m_browserService && (exec == m_browserExec))
-            exec = m_browserService->storageId(); // Use service
-        else
-            exec = '!' + exec; // Literal command
+        exec = m_browsers.at(kcombobox->currentIndex())->storageId();
     }
+
+    KConfigGroup config(KSharedConfig::openConfig("kdeglobals"), QLatin1String("General") );
     config.writePathEntry( QLatin1String("BrowserApplication"), exec); // KConfig::Normal|KConfig::Global
     config.sync();
 
     KGlobalSettings::self()->emitChange(KGlobalSettings::SettingsChanged);
 
     emit changed(false);
-}
-
-void CfgBrowser::selectBrowser()
-{
-    KUrl::List urlList;
-    KOpenWithDialog dlg(urlList, i18n("Select preferred Web browser application:"), QString(), this);
-    if (dlg.exec() != QDialog::Accepted)
-        return;
-    m_browserService = dlg.service();
-    if (m_browserService) {
-        m_browserExec = m_browserService->desktopEntryName();
-        if (m_browserExec.isEmpty())
-            m_browserExec = m_browserService->exec();
-    } else {
-        m_browserExec = dlg.text();
-    }
-    lineExec->setText(m_browserExec);
 }

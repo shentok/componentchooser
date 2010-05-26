@@ -26,6 +26,7 @@
 #include <kopenwithdialog.h>
 #include <kglobalsettings.h>
 #include <kconfiggroup.h>
+#include <KServiceTypeTrader>
 
 CfgFileManager::CfgFileManager(QWidget *parent)
     : QWidget(parent), Ui::FileManagerConfig_UI(),CfgPlugin()
@@ -49,7 +50,7 @@ void CfgFileManager::defaults()
 
 static KService::List appOffers()
 {
-    return KMimeTypeTrader::self()->query("inode/directory", "Application");
+    return KServiceTypeTrader::self()->query("Application", "'FileManager' in Categories");
 }
 
 void CfgFileManager::load(KConfig *) {
@@ -61,6 +62,7 @@ void CfgFileManager::load(KConfig *) {
     {
         QRadioButton* button = new QRadioButton(service->name(), this);
         connect(button,SIGNAL(toggled(bool)),this,SLOT(configChanged()));
+        button->setIcon(KIcon(service->icon()));
         button->setProperty("storageId", service->storageId());
         radioLayout->addWidget(button);
         if (first) {

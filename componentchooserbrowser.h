@@ -30,14 +30,12 @@ public:
 	virtual void defaults();
 
 protected Q_SLOTS:
-	void selectBrowser();
 	void configChanged();
 
 Q_SIGNALS:
 	void changed(bool);
 private:
-	QString m_browserExec;
-	KService::Ptr m_browserService;
+    QList<KService::Ptr> m_browsers;
 };
 
 #endif /* COMPONENTCHOOSERBROWSER_H */
