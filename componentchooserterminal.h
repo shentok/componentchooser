@@ -32,11 +32,12 @@ public:
 	virtual void defaults();
 
 protected Q_SLOTS:
-	void selectTerminalApp();
 	void configChanged();
 
 Q_SIGNALS:
 	void changed(bool);
+private:
+    QList<KService::Ptr> m_terminalEmulators;
 };
 
 #endif

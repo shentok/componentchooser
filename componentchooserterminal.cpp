@@ -16,32 +16,16 @@
 #include "componentchooserterminal.h"
 #include "componentchooserterminal.moc"
 
-#include <ktoolinvocation.h>
-#include <klauncher_iface.h>
-#include <QtDBus/QtDBus>
-#include <QCheckBox>
-
-#include <kdebug.h>
-#include <kapplication.h>
-#include <klocale.h>
-#include <kmessagebox.h>
-#include <kopenwithdialog.h>
-#include <kconfig.h>
-#include <kstandarddirs.h>
-#include <kmimetypetrader.h>
-#include <kurlrequester.h>
+#include <kglobalsettings.h>
 #include <kconfiggroup.h>
+#include <KServiceTypeTrader>
 
 
 CfgTerminalEmulator::CfgTerminalEmulator(QWidget *parent)
     : QWidget(parent), Ui::TerminalEmulatorConfig_UI(), CfgPlugin()
 {
 	setupUi(this);
-	connect(terminalLE,SIGNAL(textChanged(QString)), this, SLOT(configChanged()));
-	connect(terminalCB,SIGNAL(toggled(bool)),this,SLOT(configChanged()));
-	connect(otherCB,SIGNAL(toggled(bool)),this,SLOT(configChanged()));
-	connect(btnSelectTerminal,SIGNAL(clicked()),this,SLOT(selectTerminalApp()));
-
+    connect(kcombobox, SIGNAL(currentIndexChanged(int)), this, SLOT(configChanged()));
 }
 
 CfgTerminalEmulator::~CfgTerminalEmulator() {
@@ -59,47 +43,50 @@ void CfgTerminalEmulator::defaults()
 
 
 void CfgTerminalEmulator::load(KConfig *) {
-        KConfigGroup config(KSharedConfig::openConfig("kdeglobals"), "General");
-	QString terminal = config.readPathEntry("TerminalApplication","konsole");
-	if (terminal == "konsole")
-	{
-	   terminalLE->setText("xterm");
-	   terminalCB->setChecked(true);
-	}
-	else
-	{
-	  terminalLE->setText(terminal);
-	  otherCB->setChecked(true);
-	}
+    m_terminalEmulators.clear();
+    kcombobox->clear();
 
-	emit changed(false);
+    foreach(KService::Ptr browser, KServiceTypeTrader::self()->query("Application", "'TerminalEmulator' in Categories"))
+    {
+        m_terminalEmulators << browser;
+        kcombobox->addItem(KIcon(browser->icon()), browser->name());
+    }
+
+    KConfigGroup config(KSharedConfig::openConfig("kdeglobals"), QLatin1String("General") );
+    QString exec = config.readPathEntry( QLatin1String("TerminalApplication"), "konsole" );
+    if (!exec.isEmpty())
+    {
+        KService::Ptr browserService = KService::serviceByStorageId( exec );
+        if (browserService)
+        {
+            int i = 0;
+            foreach(KService::Ptr browser, m_terminalEmulators)
+            {
+                if (browser->storageId() == browserService->storageId())
+                {
+                    kcombobox->setCurrentIndex(i);
+                }
+                i++;
+            }
+        }
+    }
+
+    emit changed(false);
 }
 
 void CfgTerminalEmulator::save(KConfig *)
 {
-	KConfigGroup config(KSharedConfig::openConfig("kdeglobals"), "General");
-	const QString terminal = terminalCB->isChecked() ? "konsole" : terminalLE->text();
-	config.writePathEntry("TerminalApplication", terminal); // KConfig::Normal|KConfig::Global);
-	config.sync();
+    if (m_terminalEmulators.count() > kcombobox->currentIndex() && kcombobox->currentIndex() >= 0)
+    {
+        const QString storageId = m_terminalEmulators.at(kcombobox->currentIndex())->storageId();
 
-	KGlobalSettings::self()->emitChange(KGlobalSettings::SettingsChanged);
-	KToolInvocation::klauncher()->reparseConfiguration();
+        KConfigGroup config(KSharedConfig::openConfig("kdeglobals"), QLatin1String("General") );
+        config.writePathEntry( QLatin1String("TerminalApplication"), storageId); // KConfig::Normal|KConfig::Global
+        config.sync();
+    }
 
-	emit changed(false);
-}
+    KGlobalSettings::self()->emitChange(KGlobalSettings::SettingsChanged);
 
-void CfgTerminalEmulator::selectTerminalApp()
-{
-	KUrl::List urlList;
-	KOpenWithDialog dlg(urlList, i18n("Select preferred terminal application:"), QString(), this);
-	// hide "Run in &terminal" here, we don't need it for a Terminal Application
-	dlg.hideRunInTerminal();
-	if (dlg.exec() != QDialog::Accepted) return;
-	QString client = dlg.text();
-
-	if (!client.isEmpty())
-	{
-		terminalLE->setText(client);
-	}
+    emit changed(false);
 }
 // vim: sw=4 ts=4 noet
