@@ -25,6 +25,8 @@ CfgBrowser::CfgBrowser(QWidget *parent)
     : QWidget(parent), Ui::BrowserConfig_UI(),CfgPlugin()
 {
     setupUi(this);
+    command->setEnabled(false);
+    runInTerminal->setEnabled(false);
     connect(kcombobox, SIGNAL(currentIndexChanged(int)), this, SLOT(configChanged()));
 }
 
@@ -33,6 +35,11 @@ CfgBrowser::~CfgBrowser() {
 
 void CfgBrowser::configChanged()
 {
+    const QString storageId = m_browsers.at(kcombobox->currentIndex())->storageId();
+    KService::Ptr browser = KService::serviceByStorageId(storageId);
+    command->setText(browser->exec());
+    runInTerminal->setChecked(browser->terminal());
+
     emit changed(true);
 }
 
