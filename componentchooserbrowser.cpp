@@ -14,7 +14,6 @@
  ***************************************************************************/
 
 #include "componentchooserbrowser.h"
-#include <kopenwithdialog.h>
 #include <kglobalsettings.h>
 #include <kconfiggroup.h>
 #include <KServiceTypeTrader>
@@ -55,7 +54,7 @@ void CfgBrowser::load(KConfig *)
     }
 
     KConfigGroup config(KSharedConfig::openConfig("kdeglobals"), QLatin1String("General") );
-    QString exec = config.readPathEntry( QLatin1String("BrowserApplication"), QString("") );
+    QString exec = config.readPathEntry( QLatin1String("BrowserApplication"), "konqbrowser" );
     if (!exec.isEmpty())
     {
         KService::Ptr browserService = KService::serviceByStorageId( exec );
