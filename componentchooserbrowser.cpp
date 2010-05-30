@@ -18,6 +18,7 @@
 #include <kglobalsettings.h>
 #include <kconfiggroup.h>
 #include <KServiceTypeTrader>
+#include <KBuildSycocaProgressDialog>
 
 
 
@@ -77,15 +78,28 @@ void CfgBrowser::load(KConfig *)
 
 void CfgBrowser::save(KConfig *)
 {
-    QString exec;
-    if (m_browsers.count() > kcombobox->currentIndex())
+    if (m_browsers.count() > kcombobox->currentIndex() && kcombobox->currentIndex() >= 0)
     {
-        exec = m_browsers.at(kcombobox->currentIndex())->storageId();
-    }
+        const QString storageId = m_browsers.at(kcombobox->currentIndex())->storageId();
 
-    KConfigGroup config(KSharedConfig::openConfig("kdeglobals"), QLatin1String("General") );
-    config.writePathEntry( QLatin1String("BrowserApplication"), exec); // KConfig::Normal|KConfig::Global
-    config.sync();
+        {
+            KConfigGroup config(KSharedConfig::openConfig("kdeglobals"), QLatin1String("General") );
+            config.writePathEntry( QLatin1String("BrowserApplication"), storageId); // KConfig::Normal|KConfig::Global
+            config.sync();
+        }
+
+        KSharedConfig::Ptr profile = KSharedConfig::openConfig("mimeapps.list", KConfig::NoGlobals, "xdgdata-apps");
+        if (profile->isConfigWritable(true))
+        {
+            KConfigGroup addedApps(profile, "Added Associations");
+            QStringList userApps = addedApps.readXdgListEntry("text/html");
+            userApps.removeAll(storageId); // remove if present, to make it first in the list
+            userApps.prepend(storageId);
+            addedApps.writeXdgListEntry("text/html", userApps);
+            profile->sync();
+            KBuildSycocaProgressDialog::rebuildKSycoca(this);
+        }
+    }
 
     KGlobalSettings::self()->emitChange(KGlobalSettings::SettingsChanged);
 
